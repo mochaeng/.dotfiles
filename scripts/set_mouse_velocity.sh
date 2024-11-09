@@ -8,7 +8,7 @@
 # xinput --set-prop <id> <XXX> 0 1
 
 velocity=""
-mouse_id="14"
+mouse_id="15"
 transformation_matrix_id="157"
 
 optstring=":v:"
