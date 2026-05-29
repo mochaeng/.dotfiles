@@ -1,0 +1,876 @@
+:PROPERTIES:
+#+PROPERTY: header-args :tangle yes
+#+OPTIONS: toc:2
+# #+STARTUP: overview
+#+STARTUP: content indent
+:END:
+
+* Table of Contents :toc_2_gh:
+- [[#about][About]]
+- [[#setup][Setup]]
+  - [[#initel-code][=init.el= Code]]
+  - [[#lexical-binding][Lexical Binding]]
+  - [[#tangling][Tangling]]
+- [[#start-up][Start-Up]]
+  - [[#early-init][Early Init]]
+  - [[#optimizations][Optimizations]]
+  - [[#package-manager--package-sources][Package Manager & Package Sources]]
+- [[#primitives][Primitives]]
+  - [[#built-in][Built-in]]
+  - [[#terminal][Terminal]]
+- [[#ui][UI]]
+  - [[#basic-ui-settings][Basic UI Settings]]
+  - [[#styling][Styling]]
+  - [[#scrolling][Scrolling]]
+  - [[#fonts][Fonts]]
+  - [[#line-numbers][Line numbers]]
+  - [[#icons][Icons]]
+  - [[#theme][Theme]]
+  - [[#modeline][Modeline]]
+  - [[#ligatures][Ligatures]]
+- [[#keybindings][Keybindings]]
+  - [[#unbiding][Unbiding]]
+  - [[#evil-mode][Evil mode]]
+  - [[#general-leader-keys][General (Leader Keys)]]
+  - [[#which-key][Which Key]]
+  - [[#global-keybindings][Global Keybindings]]
+  - [[#leader-key-bindings][Leader Key Bindings]]
+  - [[#hydra][Hydra]]
+- [[#completion][Completion]]
+  - [[#ivy-counsel--swiper][Ivy, Counsel & Swiper]]
+  - [[#helpful][Helpful]]
+- [[#visual-enhancements][Visual Enhancements]]
+  - [[#rainbow-delimiters][Rainbow Delimiters]]
+- [[#version-control][Version Control]]
+  - [[#diff-highlightining--magit][Diff Highlightining & Magit]]
+- [[#project-management][Project Management]]
+  - [[#projectile][Projectile]]
+- [[#dev-extensions][Dev Extensions]]
+  - [[#smartparens][Smartparens]]
+- [[#org-mode][Org Mode]]
+  - [[#core-org-settings][Core Org Settings]]
+  - [[#org-appear][Org Appear]]
+  - [[#org-superstar][Org Superstar]]
+  - [[#toc-in-org][Toc in Org]]
+- [[#languages][Languages]]
+  - [[#scheme][Scheme]]
+- [[#left][Left]]
+
+* About
+
+I decided to organize my Emacs configuration into something called a "literate config". The entire configuration is written in this =.org= file, and through the =org-babel-tangle= extension it is possible to extract the code from the source blocks and generate the standard Emacs configuration file =init.el=. This way, you can document your configuration so you can remember in the future why you made certain choices
+
+You can watch [[https://www.youtube.com/watch?v=Dkoy3NrLN9g][this video]] to get an idea.
+
+I made this with help from:
+- [[https://github.com/SophieBosio/.emacs.d/blob/main/init.org][Sophie’s Emacs Configuration]]
+- [[https://github.com/larstvei/dot-emacs/blob/main/init.org][Lars Tveito's Configuration]]
+    
+* Setup
+** =init.el= Code
+
+This is how the initial =init.el= inside (=~/.emacs.d/=) should look like:
+
+#+BEGIN_SRC emacs-lisp :tangle no
+  (require 'org)
+  (find-file (concat user-emacs-directory "init.org"))
+  (org-babel-tangle)  
+  (load-file (concat user-emacs-directory "init.el"))
+  (byte-compile-file (concat user-emacs-directory "init.el"))
+#+END_SRC
+
+After tangling, the file =init.el= will be overwritten with the content from this org file.
+
+Since the content is generated, there's no reason to track =init.el=.
+
+So you can use the following git command to stop tracking it:
+
+#+BEGIN_SRC sh :tangle no
+  git update-index --assume-unchanged init.el
+#+END_SRC
+
+And if you want to start tracking it again:
+
+#+BEGIN_SRC sh :tangle no
+  git update-index --no-assume-unchanged init.el
+#+END_SRC
+
+** Lexical Binding
+
+To enable lexical binding in =init.el=:
+
+#+BEGIN_SRC emacs-lisp
+  ;;; -*- lexical-binding: t -*-
+#+END_SRC
+
+** Tangling
+
+To tangle this org file and run =org-babel-tangle=, you can use =C-c C-v t=.
+
+To avoid doing that manually and have it run every time you save, I use this function from Lars' config:
+
+#+BEGIN_SRC emacs-lisp
+  (defun tangle-init ()
+    "If the current buffer is init.org the code-blocks are
+  tangled, and the tangled file is compiled."
+    (when (equal (buffer-file-name)
+                 (expand-file-name (concat user-emacs-directory "init.org")))
+      ;; Avoid running hooks when tangling.
+      (let ((prog-mode-hook nil))
+        (org-babel-tangle)
+        (byte-compile-file (concat user-emacs-directory "init.el")))))
+
+  (add-hook 'after-save-hook 'tangle-init)
+#+END_SRC
+
+* Start-Up
+** Early Init
+
+To make customization during startup time, Emacs allow the creation of a file called [[https://www.gnu.org/software/emacs/manual/html_node/emacs/Early-Init-File.html][=early-init.el=]]. It's loaded before the package system and GUI is initialized.
+
+I got the code from:
+- [[https://github.com/SophieBosio/.emacs.d/blob/main/init.org][Sophie’s Emacs Configuration]]
+
+#+begin_src emacs-lisp :tangle early-init.el
+   ;;; -*- lexical-binding: t -*-
+
+  ;; Defer garbage collection
+  (setq gc-cons-percentage 0.6)
+
+  ;; Change default max size for reading processes
+  (setq read-process-output-max (* 1024 1024)) ;; 1mb
+
+  (set-language-environment "UTF-8")
+
+  ;; Set-language-environment sets default-input-method, which is unwanted.
+  (setq default-input-method nil)
+
+  ;; Prefer loading newer compiled files
+  (setq load-prefer-newer t)
+
+  ;; Prevent the glimpse of un-styled Emacs by disabling these UI elements early.
+  (setq default-frame-alist
+        '((vertical-scroll-bars . nil)
+          (menu-bar-lines       . 0)
+          (tool-bar-lines       . 0)))
+
+  (setq default-frame-scroll-bars 'right)
+
+  ;; Disable visible scrollbar
+  (setq scroll-bar-mode nil) 
+
+  ;; Resizing the Emacs frame can be a terribly expensive part of changing the
+  ;; font. By inhibiting this, we easily halve startup times with fonts that are
+  ;; larger than the system default.
+  (setq frame-inhibit-implied-resize t
+        frame-resize-pixelwise       t)
+
+  ;; Font compacting can be very resource-intensive, especially when rendering
+  ;; icon fonts on Windows. This will increase memory usage.
+  (setq inhibit-compacting-font-caches t)
+
+  ;; Ignore X resources; its settings would be redundant with the other settings
+  ;; in this file and can conflict with later config (particularly where the
+  ;; cursor color is concerned).
+  (advice-add #'x-apply-session-resources :override #'ignore)
+
+  ;; A second, case-insensitive pass over `auto-mode-alist' is time wasted.
+  ;; No second pass of case-insensitive search over auto-mode-alist.
+  (setq auto-mode-case-fold nil)
+
+  ;; Disable bidirectional text scanning for a modest performance boost.
+  (setq-default bidi-display-reordering  'left-to-right
+                bidi-paragraph-direction 'left-to-right)
+
+  ;; Give up some bidirectional functionality for slightly faster re-display.
+  (setq bidi-inhibit-bpa t)
+
+  ;; In PGTK, this timeout introduces latency. Reducing it from the default 0.1
+  ;; improves responsiveness of childframes and related packages.
+  (when (boundp 'pgtk-wait-for-event-timeout)
+    (setq pgtk-wait-for-event-timeout 0.001))
+
+  ;; Disable warnings from the legacy advice API. They aren't useful.
+  (setq ad-redefinition-action 'accept)
+
+  ;; Font compacting can be very resource-intensive, especially when rendering
+  ;; icon fonts on Windows. This will increase memory usage.
+  (setq inhibit-compacting-font-caches t)
+
+  ;; Unset `file-name-handler-alist' too (temporarily). Every file opened and
+  ;; loaded by Emacs will run through this list to check for a proper handler for
+  ;; the file, but during startup, it won’t need any of them.
+  (defvar file-name-handler-alist-old file-name-handler-alist)
+  (setq file-name-handler-alist nil)
+  (add-hook 'emacs-startup-hook
+            (lambda ()
+              (setq file-name-handler-alist file-name-handler-alist-old)))
+
+  ;; Shave seconds off startup time by starting the scratch buffer in
+  ;; `fundamental-mode'
+  (setq initial-major-mode 'fundamental-mode
+        initial-scratch-message nil)
+
+  ;; For terminal emacs
+  (add-hook
+   'after-make-frame-functions
+   (defun setup-blah-keys (frame)
+     (with-selected-frame frame
+       (when (display-graphic-p) ; don't remove this condition, if you want
+  					; terminal Emacs to be usable
+         (define-key input-decode-map (kbd "C-i") [C-i])
+         (define-key input-decode-map (kbd "C-[") [C-lsb]) ; left square bracket
+         (define-key input-decode-map (kbd "C-m") [C-m])))))
+#+end_src
+
+** Optimizations
+
+Some optimizations I got from:
+- [[https://github.com/SophieBosio/.emacs.d/blob/main/init.org][Sophie’s Emacs Configuration]]
+
+Garbarge collector hack with [[https://github.com/emacsmirror/gcmh][gcmh]].
+
+#+BEGIN_SRC emacs-lisp
+(use-package gcmh
+  :config
+  (gcmh-mode 1))
+#+END_SRC
+
+Safe to ignore compilation warnings.
+
+#+begin_src emacs-lisp
+(setq native-comp-async-report-warnings-errors 'silent)
+(setq byte-compile-warnings '(not free-vars unresolved noruntime lexical make-local))
+#+end_src
+
+Disable warnings about obsolete functions.
+
+#+begin_src emacs-lisp
+(eval-when-compile
+  (dolist (sym '(cl-flet lisp-complete-symbol))
+    (setplist sym (use-package-plist-delete
+                   (symbol-plist sym) 'byte-obsolete-info))))
+#+end_src
+
+Optimisation borrowed from Doom Emacs' =core.el=.
+
+#+begin_src emacs-lisp
+(setq which-func-update-delay 1.0)
+#+end_src
+
+Prevent Emacs from freezing when updating ELPA.
+
+#+begin_src emacs-lisp
+(setq gnutls-algorithm-priority "NORMAL:-VERS-TLS1.3")
+#+end_src
+
+Make sure we're using the correct native compilation cache.
+
+#+begin_src emacs-lisp
+(setq native-comp-eln-load-path '("~/.emacs.d/eln-cache/"))
+#+end_src
+
+** Package Manager & Package Sources
+
+#+begin_src emacs-lisp
+  (require 'package)
+  (require 'use-package)
+  (require 'use-package-ensure)
+  (require 'ert)
+  (setq use-package-always-ensure t)
+#+end_src
+
+Here are the packages sources.
+
+#+begin_src emacs-lisp
+  ;; Initialize package sources
+  (setq package-archives '(("GNU ELPA" . "https://elpa.gnu.org/packages/")
+                           ("MELPA" . "https://melpa.org/packages/")
+                           ("ORG" . "https://orgmode.org/elpa/")
+                           ("MELPA Stable" . "https://stable.melpa.org/packages/")
+                           ("nongnu"       . "https://elpa.nongnu.org/nongnu/"))
+        package-archive-priorities
+        '(("GNU ELPA"     . 20)
+          ("MELPA"     . 15)
+          ("ORG"     . 10)
+          ("MELPA Stable"     . 5)
+          ("nongnu"     . 0)))
+  (package-initialize)
+#+end_src
+
+Upgrading built-in packages. 
+
+#+begin_src emacs-lisp
+(setq package-install-upgrade-built-in t)
+#+end_src
+
+* Primitives
+** Built-in
+Default directories.
+
+#+BEGIN_SRC emacs-lisp
+  (setq user-emacs-directory "~/.emacs.d/")
+  (setq default-directory "~/")
+#+END_SRC
+
+ Set UTF-8.
+
+ #+BEGIN_SRC emacs-lisp
+   (set-language-environment    "UTF-8")
+   (setq locale-coding-system   'utf-8)
+   (prefer-coding-system        'utf-8)
+   (set-default-coding-systems  'utf-8)
+   (set-terminal-coding-system  'utf-8)
+   (set-keyboard-coding-system  'utf-8)
+   (set-selection-coding-system 'utf-8)
+ #+END_SRC
+
+Only warns when opening files over 30 MB.
+
+#+begin_src emacs-lisp
+  (setq large-file-warning-threshold (* 30 1024 1024))
+#+end_src
+
+From [[https://github.com/jamescherti/minimal-emacs.d/blob/8d975e882026f1433086e6dcf86c1b9acaac61a1/init.el#L159-L173][minimal-emacs.d]] avoids creating a bunch of lockfiles or backup files.
+
+#+begin_src emacs-lisp
+  (setq create-lockfiles nil)
+  (setq make-backup-files nil)
+
+  (setq backup-directory-alist
+        `(("." . ,(expand-file-name "backup" user-emacs-directory))))
+  (setq tramp-backup-directory-alist backup-directory-alist)
+
+  (setq backup-by-copying-when-linked t)
+  (setq backup-by-copying             t) ; Backup by copying rather renaming
+  (setq delete-old-versions           t) ; Delete excess backup versions silently
+  (setq version-control               t) ; Use version numbers for backup files
+  (setq kept-new-versions             5)
+  (setq kept-old-versions             5)
+#+end_src
+
+** Terminal
+
+Track current directory.
+
+#+begin_src emacs-lisp
+(dirtrack-mode t)
+#+end_src
+
+* UI
+** Basic UI Settings
+
+#+begin_src emacs-lisp
+  ; Give some breathing room
+  (set-fringe-mode 10)
+  (global-visual-line-mode t) ;; Break lines instead of truncating them
+#+end_src
+
+** Styling
+
+#+begin_src emacs-lisp
+  (use-package rainbow-delimiters
+    :hook (prog-mode . rainbow-delimiters-mode))
+#+end_src
+
+#+begin_src emacs-lisp
+(show-paren-mode t) ;; Highlight matching parentheses
+#+end_src
+
+*** Olivetti
+
+[[https://github.com/rnkn/olivetti][Olivetti]] is a minor mode for centering text. For convenience, I'll bind it to =C-c o= to activate/deactivate it on the fly.
+
+#+BEGIN_SRC emacs-lisp
+  (use-package olivetti
+    :defer t
+    :config
+    (setq olivetti-style t
+  	olivetti-body-width 110))
+#+END_SRC
+
+*** Adaptive Wrap
+
+For wrap lines [[https://elpa.gnu.org/packages/adaptive-wrap.html][adaptive-wrap]]. 
+
+#+begin_src emacs-lisp
+  (use-package adaptive-wrap
+    :defer t
+    :hook (visual-line-mode . adaptive-wrap-prefix-mode))
+#+end_src
+
+*** Writeroom
+
+[[https://github.com/joostkremers/writeroom-mode][Writeroom]] Gives a distraction-free writing for Emacs. 
+
+#+begin_src emacs-lisp
+(use-package writeroom-mode
+  :defer t)
+#+end_src
+
+** Scrolling
+
+#+begin_src emacs-lisp
+  (setq scroll-conservatively            101
+        mouse-wheel-follow-mouse         't
+        mouse-wheel-progressive-speed    nil
+        ;; Scroll 1 line at a time, instead of default 5
+        ;; Hold shift to scroll faster and meta to scroll very fast
+        mouse-wheel-scroll-amount        '(1 ((shift) . 3) ((meta) . 6)))
+
+  (pixel-scroll-mode)
+  (pixel-scroll-precision-mode)
+
+  (setq mac-redisplay-dont-reset-vscroll t
+        mac-mouse-wheel-smooth-scroll    nil)
+
+  (setq scroll-margin 1)
+#+end_src
+
+** Fonts
+
+#+begin_src emacs-lisp
+  (defvar mocha/font-height 115)
+
+  ;;(set-face-attribute 'default nil :font "Fragment Mono" :height my/font-height)
+  ;;(set-face-attribute 'fixed-pitch nil :family "Fragment Mono")
+
+  (when (member "JetBrains Mono" (font-family-list))
+    (set-face-attribute 'default nil :font "JetBrains Mono" :height mocha/font-height)
+    (set-face-attribute 'fixed-pitch nil :family "JetBrains Mono"))
+
+  (use-package mixed-pitch
+    :defer t
+    :hook ((org-mode   . mixed-pitch-mode)
+           (LaTeX-mode . mixed-pitch-mode)))
+#+end_src
+
+** Line numbers
+
+#+begin_src emacs-lisp
+  ;; line numbers
+  (column-number-mode)
+  (global-display-line-numbers-mode t)
+#+end_src
+
+** Icons
+
+#+begin_src emacs-lisp
+(use-package nerd-icons)
+#+end_src
+
+** Theme
+
+#+begin_src emacs-lisp
+(use-package south-theme
+  :vc (:url "https://github.com/SophieBosio/south"
+       :rev :newest
+       :branch "main"))
+#+end_src
+
+#+begin_src emacs-lisp
+  (use-package doom-themes
+    :ensure t
+    :custom
+    ;; Global settings (defaults)
+    (doom-themes-enable-bold t)   ; if nil, bold is universally disabled
+    (doom-themes-enable-italic t) ; if nil, italics is universally disabled
+    ;; for treemacs users
+    (doom-themes-treemacs-theme "south") ; use "doom-colors" for less minimal icon theme
+    :config
+    (load-theme 'doom-spacegrey t)
+    ;; Enable flashing mode-line on errors
+    (doom-themes-visual-bell-config)
+    ;; Enable custom neotree theme (nerd-icons must be installed!)
+    (doom-themes-neotree-config)
+    ;; or for treemacs users
+    (doom-themes-treemacs-config)
+    ;; Corrects (and improves) org-mode's native fontification.
+    (doom-themes-org-config))
+#+end_src
+
+** Modeline
+
+#+begin_src emacs-lisp
+  (use-package doom-modeline
+    :ensure t
+    :init (doom-modeline-mode 1)
+    :custom ((doom-modeline-height 30)))
+#+end_src
+
+** Ligatures
+
+#+begin_src emacs-lisp
+    (defvar ligature-def '("|||>" "<|||" "<==>" "<!--" "####" "~~>" "***" "||=" "||>"
+                           ":::" "::=" "=:=" "===" "==>" "=!=" "=>>" "=<<" "=/=" "!=="
+                           "!!." ">=>" ">>=" ">>>" ">>-" ">->" "->>" "-->" "---" "-<<"
+                           "<~~" "<~>" "<*>" "<||" "<|>" "<$>" "<==" "<=>" "<=<" "<->"
+                           "<--" "<-<" "<<=" "<<-" "<<<" "<+>" "</>" "###" "#_(" "..<"
+                           "..." "+++" "/==" "///" "_|_" "www" "&&" "^=" "~~" "~@" "~="
+                           "~>" "~-" "**" "*>" "*/" "||" "|}" "|]" "|=" "|>" "|-" "{|"
+                           "[|" "]#" "::" ":=" ":>" ":<" "$>" "==" "=>" "!=" "!!" ">:"
+                           ">=" ">>" ">-" "-~" "-|" "->" "--" "-<" "<~" "<*" "<|" "<:"
+                           "<$" "<=" "<>" "<-" "<<" "<+" "</" "#{" "#[" "#:" "#=" "#!"
+                           "##" "#(" "#?" "#_" "%%" ".=" ".-" ".." ".?" "+>" "++" "?:"
+                           "?=" "?." "??" ";;" "/*" "/=" "/>" "//" "__" "~~" "(*" "*)"
+                           "\\\\" "://"))
+
+    (use-package ligature
+      :config
+      (ligature-set-ligatures 'prog-mode ligature-def)
+      (global-ligature-mode t))
+#+end_src
+* Keybindings
+** Unbiding
+
+#+begin_src emacs-lisp
+(global-unset-key (kbd "C-x C-z"))  ;; Hides current Emacs frame
+(global-unset-key (kbd "C-z"))  ;; Suspend the Emacs frame
+#+end_src
+
+** Evil mode
+
+Evil must be loaded before General so its keymaps exist when bindings are defined.
+
+#+begin_src emacs-lisp
+  (use-package evil
+    :demand t
+    :init
+    (setq evil-want-integration t)
+    (setq evil-want-keybinding nil)
+    (setq evil-want-C-u-scroll t)
+    (setq evil-want-C-i-jump nil)
+    :config
+    (evil-mode 1)
+    (define-key evil-insert-state-map (kbd "C-g") 'evil-normal-state)
+    (define-key evil-insert-state-map (kbd "C-h") 'evil-delete-backward-char-and-join)
+    ;; Use visual line motions even outside of visual-line-mode buffers
+    (evil-global-set-key 'motion "j" 'evil-next-visual-line)
+    (evil-global-set-key 'motion "k" 'evil-previous-visual-line)
+    (evil-set-initial-state 'messages-buffer-mode 'normal)
+    (evil-set-initial-state 'dashboard-mode 'normal))
+
+
+  (use-package evil-collection
+    :after evil
+    :config
+    (evil-collection-init))
+#+end_src
+
+** General (Leader Keys)
+
+#+begin_src emacs-lisp
+  (use-package general
+    :demand t
+    :after evil
+    :config
+    )
+#+end_src
+
+#+begin_src emacs-lisp
+  (general-create-definer rune/leader-keys
+    :keymaps `(normal insert visual emacs)
+    :prefix "SPC"
+    :global-prefix "C-SPC")
+#+end_src
+
+** Which Key
+
+#+begin_src emacs-lisp
+  (which-key-mode 1)
+  (setq which-key-idle-delay 0)
+#+end_src
+
+** Global Keybindings
+
+#+begin_src emacs-lisp
+  (global-set-key (kbd "<escape>") 'keyboard-escape-quit)
+#+end_src
+
+** Leader Key Bindings
+
+All =rune/leader-keys= calls are consolidated here so they run after General and Evil are loaded.
+
+#+begin_src emacs-lisp
+  (with-eval-after-load 'general
+    (rune/leader-keys
+        ;; toggles
+        "t"  '(:ignore t :which-key "toggles")
+        "tt" '(counsel-load-theme :which-key "choose theme")
+        "ts" '(hydra-text-scale/body :which-key "scale text")
+
+        ;; files
+        "f"  '(:ignore t :which-key "files")
+        "ff" '(counsel-find-file :which-key "find file")
+        "fs" '(save-buffer :which-key "save file")
+        "fr" '(counsel-recentf :which-key "recent files")
+
+        ;; evaluation
+        "e"  '(:ignore t :which-key "eval")
+        "ee" '(eval-last-sexp :which-key "eval last sexp")
+        "er" '(eval-region :which-key "eval region")
+        "eb" '(eval-buffer :which-key "eval buffer")
+        "ed" '(eval-defun :which-key "eval defun")
+
+        ;; buffers
+        "b"  '(:ignore t :which-key "buffers")
+        "bb" '(counsel-ibuffer :which-key "switch buffer")
+        "bk" '(kill-this-buffer :which-key "kill buffer")
+        "bn" '(next-buffer :which-key "next buffer")
+        "bp" '(previous-buffer :which-key "prev buffer")
+
+        ;; windows
+        "w"  '(:ignore t :which-key "windows")
+        "wv" '(split-window-right :which-key "split vertical")
+        "ws" '(split-window-below :which-key "split horizontal")
+        "wk" '(delete-window :which-key "close window")
+        "ww" '(other-window :which-key "other window")
+
+        ;; search
+        "s"  '(:ignore t :which-key "search")
+        "ss" '(swiper :which-key "swiper")
+        "sr" '(counsel-rg :which-key "ripgrep")
+
+        ;; help
+        "h"  '(:ignore t :which-key "help")
+        "hf" '(helpful-function :which-key "describe function")
+        "hv" '(helpful-variable :which-key "describe variable")
+        "hk" '(helpful-key :which-key "describe key")
+
+        ;; meta-x 
+        ":" '(counsel-M-x :which-key "M-x")))
+#+end_src
+
+** Hydra
+
+#+begin_src emacs-lisp
+  (use-package hydra)
+  (defhydra hydra-text-scale (:timeout 4)
+    "scale text"
+    ("j" text-scale-increase "in")
+    ("k" text-scale-decrease "out")
+    ("f" nil "finished" :exit t))
+#+end_src
+
+* Completion
+** Ivy, Counsel & Swiper
+
+#+begin_src emacs-lisp
+  (use-package ivy
+    :demand t
+    :diminish
+    :bind (("C-s" . swiper)
+           :map ivy-minibuffer-map
+           ("TAB" . ivy-alt-done)	
+           ("C-l" . ivy-alt-done)
+           ("C-j" . ivy-next-line)
+           ("C-k" . ivy-previous-line)
+           :map ivy-switch-buffer-map
+           ("C-k" . ivy-previous-line)
+           ("C-l" . ivy-done)
+           ("C-d" . ivy-switch-buffer-kill)
+           :map ivy-reverse-i-search-map
+           ("C-k" . ivy-previous-line)
+           ("C-d" . ivy-reverse-i-search-kill))
+    :config (ivy-mode 1))
+
+  (use-package ivy-rich
+    :after (ivy counsel)
+    :init
+    (ivy-rich-mode 1))
+
+  (use-package counsel
+    :bind (("M-x" . counsel-M-x)
+  	 ("C-x b" . counsel-ibuffer)
+  	 ("C-x C-f" . counsel-find-file)
+  	 :map minibuffer-local-map
+  	 ("C-r" . 'counsel-minibuffer-history))
+    :config
+    (setq ivy-initial-inputs-alist nil))  ;; don't start searches with ^
+#+end_src
+
+** Helpful
+
+#+begin_src emacs-lisp
+  (use-package helpful
+    :custom
+    (counsel-describe-function-function #'helpful-callable)
+    (counsel-describe-variable-function #'helpful-variable)
+    :bind (([remap describe-function] . helpful-function)
+           ([remap describe-symbol] . helpful-symbol)
+           ([remap describe-variable] . helpful-variable)
+           ([remap describe-command] . helpful-command)
+           ([remap describe-key] . helpful-key)))
+#+end_src
+
+* Visual Enhancements
+** Rainbow Delimiters
+
+* Version Control
+** Diff Highlightining & Magit
+
+#+begin_src emacs-lisp
+  (use-package diff-hl
+    :config
+    (global-diff-hl-mode))
+
+  (use-package magit
+    :defer t
+    :hook
+    ((magit-pre-refresh  . ignore)
+     (magit-post-refresh . diff-hl-magit-post-refresh))
+    :config
+    (setq magit-auto-revert-mode t)
+    (remove-hook 'magit-status-sections-hook 'magit-insert-tags-header)
+    (remove-hook 'magit-status-sections-hook 'magit-insert-status-headers))
+#+end_src
+
+* Project Management
+** Projectile
+
+#+begin_src emacs-lisp
+  (use-package projectile
+    :defer t
+    :bind (:map projectile-mode-map
+              ("C-c p" . projectile-command-map))
+    :config
+                                        ;(add-to-list 'projectile-project-search-path "~/Dropbox/projects/")
+                                        ;(add-to-list 'projectile-project-search-path "~/Dropbox/playground/")
+    (setq projectile-create-missing-test-files t)
+    :init
+    (projectile-mode))
+
+  (rune/leader-keys
+    "p"   '(:ignore t :which-key "project")
+    "pp"  '(projectile-switch-project       :which-key "switch project")
+    "pf"  '(projectile-find-file            :which-key "find file")
+    "pr"  '(projectile-recentf              :which-key "recent files")
+    "pR"  '(projectile-run-project          :which-key "run project")
+    "ps"  '(projectile-save-project-buffers :which-key "save buffers")
+    "pT"  '(projectile-test-project         :which-key "test project")
+    "pk"  '(projectile-kill-buffers         :which-key "kill buffers"))
+#+end_src
+* Dev Extensions
+** Smartparens
+
+#+begin_src emacs-lisp
+  (use-package smartparens
+    :ensure smartparens  ;; install the package
+    :hook (prog-mode text-mode markdown-mode) ;; add `smartparens-mode` to these hooks
+    :config
+    ;; load default config
+    (require 'smartparens-config))
+#+end_src
+
+* Org Mode
+** Core Org Settings
+
+#+begin_src emacs-lisp
+  (use-package org
+    :defer t
+    :config
+    (custom-set-faces
+     '(org-document-title ((t (:height 1.6))))
+     '(outline-1          ((t (:height 1.25))))
+     '(outline-2          ((t (:height 1.2))))
+     '(outline-3          ((t (:height 1.2))))
+     '(outline-4          ((t (:height 1.2))))
+     '(outline-5          ((t (:height 1.2))))
+     '(outline-6          ((t (:height 1.2))))
+     '(outline-7          ((t (:height 1.2))))
+     '(outline-8          ((t (:height 1.2))))
+     '(outline-9          ((t (:height 1.2)))))
+    (setq org-startup-folded 'content)
+    (setq org-hide-leading-stars t
+        org-pretty-entities t
+        org-ellipsis "  ·")
+    (setq org-log-done                       t
+        org-auto-align-tags                t
+        org-tags-column                    -80
+        org-fold-catch-invisible-edits     'show-and-error
+        org-special-ctrl-a/e               t
+        org-insert-heading-respect-content t))
+#+end_src
+
+** Org Appear
+
+#+begin_src emacs-lisp
+  (use-package org-appear
+    :commands (org-appear-mode)
+    :hook     (org-mode . org-appear-mode)
+    :config 
+    (setq org-hide-emphasis-markers t)  ;; Must be activated for org-appear to work
+    (setq org-appear-autoemphasis   t   ;; Show bold, italics, verbatim, etc.
+          org-appear-autolinks      t   ;; Show links
+          org-appear-autosubmarkers t)) ;; Show sub- and superscripts
+#+end_src
+
+** Org Superstar
+
+#+begin_src emacs-lisp
+  (use-package org-superstar
+    :after org
+    :config
+                                        ;(setq org-superstar-leading-bullet "")
+                                        ;(setq org-superstar-headline-bullets-list '("")) ;; Hide bullets
+    (setq org-superstar-special-todo-items t)        ;; Makes TODO header bullets into boxes
+    (setq org-superstar-todo-bullet-alist '(("TODO"     . 9744)
+                                            ("PROG"     . 9744)
+                                            ("NEXT"     . 9744)
+                                            ("WAIT"     . 9744)
+                                            ("DROP"     . 9744)
+                                            ("QUESTION" . 9744)
+                                            ("DONE"     . 9745)))
+    :hook (org-mode . org-superstar-mode))
+#+end_src
+
+** Toc in Org
+
+[[https://github.com/snosov1/toc-org][toc-org]] allows you to create table of contents. Especially useful for github readme.
+
+#+begin_src emacs-lisp
+  (use-package toc-org
+    :after org
+    :config
+    (add-hook 'org-mode-hook 'toc-org-mode)
+
+    ;; enable in markdown, too
+    (add-hook 'markdown-mode-hook 'toc-org-mode))
+#+end_src
+* Languages
+** Scheme
+
+#+begin_src emacs-lisp
+  (use-package geiser-mit
+    :ensure t
+    :config
+    (general-define-key
+     :states '(normal visual)
+     :keymaps 'scheme-mode-map   
+     :prefix "SPC"
+     "e"   '(:ignore t :which-key "eval")
+     "ee"  '(geiser-eval-last-sexp      :which-key "eval last sexp")
+     "er"  '(geiser-eval-region         :which-key "eval region")
+     "eb"  '(geiser-eval-buffer         :which-key "eval buffer")
+     "ed"  '(geiser-eval-definition     :which-key "eval defun")
+     "ef"  '(geiser-load-file           :which-key "load file")
+     "ez"  '(geiser-mode-switch-to-repl :which-key "switch to REPL"))
+    )
+
+  ;(add-to-list 'display-buffer-alist
+   ;          '("\\*Geiser.*\\*"
+    ;           (display-buffer-reuse-window display-buffer-in-side-window)
+     ;          (side . bottom)
+      ;         (slot . 0)
+       ;        (window-height . 0.3)))
+#+end_src
+
+* Left
+
+I don't know if I should use these one
+
+#+begin_src emacs-lisp
+  ;; (tool-bar-mode -1)          ; Disable the toolbar
+  ;; (tooltip-mode -1)           ; Disable tooltips
+  ;; (menu-bar-mode -1)          ; Disable the menu bar
+#+end_src
