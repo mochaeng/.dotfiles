@@ -6,6 +6,7 @@
 :END:
 
 * Table of Contents :toc_2_gh:
+- [[#compiling][Compiling]]
 - [[#about][About]]
 - [[#setup][Setup]]
   - [[#initel-code][=init.el= Code]]
@@ -55,6 +56,24 @@
 - [[#languages][Languages]]
   - [[#scheme][Scheme]]
 - [[#left][Left]]
+
+* Compiling
+
+#+BEGIN_SRC zsh :tangle no
+./configure \
+  --with-pgtk \
+  --with-cairo \
+  --with-harfbuzz \
+  --with-libsystemd \
+  --with-modules \
+  --with-native-compilation=aot \
+  --with-tree-sitter \
+  --sysconfdir=/etc \
+  --prefix=/usr/local \
+  --libexecdir=/usr/local/lib \
+  --localstatedir=/var \
+  --disable-build-details
+#+END_SRC
 
 * About
 
